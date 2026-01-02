@@ -1,0 +1,1389 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1220" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Hours & Pay" />
+  <title>Hours & Pay (Pay-Cycle Calculator)</title>
+
+  <script>
+    // Single-file manifest (data URL) for "Add to Home Screen" friendliness.
+    (function attachManifest(){
+      const manifest = {
+        name: "Hours & Pay",
+        short_name: "Hours&Pay",
+        start_url: ".",
+        display: "standalone",
+        background_color: "#0b1220",
+        theme_color: "#0b1220",
+        icons: []
+      };
+      const href = "data:application/manifest+json," + encodeURIComponent(JSON.stringify(manifest));
+      const link = document.createElement("link");
+      link.rel = "manifest";
+      link.href = href;
+      document.head.appendChild(link);
+    })();
+  </script>
+
+  <style>
+    :root{
+      --bg:#0b1220;
+      --card:#111a2e;
+      --muted:#9fb0d0;
+      --text:#e8eeff;
+      --accent:#5cc8ff;
+      --line:#223154;
+      --good:#3ddc97;
+      --warn:#ffcc66;
+      --bad:#ff6b6b;
+      --shadow: 0 12px 30px rgba(0,0,0,.35);
+      --radius2:22px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      background: radial-gradient(1200px 800px at 30% 0%, #18264a 0%, var(--bg) 55%, #070b14 100%);
+      color:var(--text);
+      padding:16px 12px 32px;
+    }
+    .wrap{max-width:1100px;margin:0 auto}
+    header{
+      display:flex; gap:12px; flex-wrap:wrap; align-items:stretch; justify-content:space-between;
+      margin-bottom:14px;
+    }
+    .title{
+      display:flex; flex-direction:column; gap:4px; min-width:240px; flex:1;
+      padding:14px 16px;
+      background:linear-gradient(180deg, rgba(92,200,255,.14), rgba(255,255,255,0));
+      border:1px solid rgba(92,200,255,.22);
+      border-radius:var(--radius2);
+      box-shadow: var(--shadow);
+    }
+    .title h1{margin:0;font-size:18px;letter-spacing:.2px}
+    .title .sub{color:var(--muted);font-size:12.5px;line-height:1.25}
+    .controls{
+      display:grid; grid-template-columns: repeat(3, minmax(180px, 1fr));
+      gap:10px; flex:2; min-width:320px;
+    }
+    .card{
+      background:rgba(17,26,46,.9);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:var(--radius2);
+      box-shadow: var(--shadow);
+      padding:14px;
+    }
+    .field{display:flex; flex-direction:column; gap:6px;}
+    label{font-size:12px;color:var(--muted)}
+    select,input{
+      width:100%;
+      padding:10px 10px;
+      background:#0c1428;
+      color:var(--text);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:12px;
+      outline:none;
+    }
+    .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
+    .row > *{flex:1}
+    .btnrow{display:flex; gap:10px; flex-wrap:wrap; margin-top:10px}
+    button{
+      border:1px solid rgba(255,255,255,.12);
+      background:linear-gradient(180deg, rgba(92,200,255,.18), rgba(255,255,255,0));
+      color:var(--text);
+      padding:10px 12px;
+      border-radius:14px;
+      cursor:pointer;
+      font-weight:600;
+    }
+    button:hover{border-color:rgba(92,200,255,.5)}
+    button.secondary{
+      background:#0c1428;
+      border-color:rgba(255,255,255,.12);
+      font-weight:600;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 1.35fr .65fr;
+      gap:12px;
+      margin-top:12px;
+    }
+
+    .summary{display:flex; flex-direction:column; gap:10px;}
+    .metric{
+      padding:12px;
+      border-radius:18px;
+      background:rgba(12,20,40,.72);
+      border:1px solid rgba(255,255,255,.08);
+    }
+    .metric .k{color:var(--muted);font-size:12px}
+    .metric .v{font-size:18px;font-weight:800;margin-top:4px}
+    .metric .hint{margin-top:6px;color:var(--muted);font-size:12px;line-height:1.25}
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:6px 10px; border-radius:999px;
+      background:rgba(92,200,255,.12);
+      border:1px solid rgba(92,200,255,.22);
+      font-size:12px; color:var(--text);
+      margin-top:8px;
+      flex-wrap:wrap;
+    }
+    .pill b{font-weight:900}
+
+    .tableCard{padding:0; overflow:hidden}
+    .tableHead{
+      display:flex; justify-content:space-between; align-items:center;
+      padding:12px 14px;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      background:linear-gradient(180deg, rgba(92,200,255,.10), rgba(255,255,255,0));
+      gap:10px;
+    }
+    .tableHead .left{display:flex; flex-direction:column; gap:2px;}
+    .tableHead .left .name{font-weight:900}
+    .tableHead .left .desc{font-size:12px;color:var(--muted)}
+    .tableHead .right{display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end;}
+    .status{
+      font-size:12px;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(12,20,40,.65);
+      color:var(--muted);
+    }
+    .status.good{color:var(--good); border-color:rgba(61,220,151,.35); background:rgba(61,220,151,.10)}
+    .status.warn{color:var(--warn); border-color:rgba(255,204,102,.35); background:rgba(255,204,102,.10)}
+    .status.bad{color:var(--bad); border-color:rgba(255,107,107,.35); background:rgba(255,107,107,.10)}
+
+    table{
+      width:100%;
+      border-collapse:collapse;
+      font-size:13px;
+    }
+    th, td{
+      padding:10px 12px;
+      border-bottom:1px solid rgba(255,255,255,.06);
+      vertical-align:middle;
+    }
+    th{
+      text-align:left;
+      font-size:12px;
+      color:var(--muted);
+      background:rgba(12,20,40,.55);
+      position:sticky; top:0; z-index:1;
+    }
+    .twrap{max-height:62vh; overflow:auto}
+    .dateCell{cursor:pointer;}
+    .dow{color:var(--muted); font-size:12px; margin-left:6px}
+    .hoursCell{font-variant-numeric: tabular-nums; font-weight:800; text-align:right}
+    .lockCell{width:56px;text-align:center}
+    .lockBtn{
+      display:inline-flex; align-items:center; justify-content:center;
+      width:36px;height:36px;border-radius:12px;
+      background:#0c1428;
+      border:1px solid rgba(255,255,255,.12);
+      cursor:pointer;
+      user-select:none;
+    }
+    .lockBtn.locked{
+      border-color:rgba(92,200,255,.45);
+      background:rgba(92,200,255,.12);
+    }
+    .small{font-size:12px;color:var(--muted)}
+    .note{margin-top:10px;color:var(--muted);font-size:12px;line-height:1.35}
+    .rightAlign{text-align:right}
+
+    .tag{
+      display:inline-flex; align-items:center;
+      padding:2px 8px;
+      border-radius:999px;
+      font-size:11px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(12,20,40,.55);
+      color:var(--muted);
+      gap:6px;
+    }
+    .tag.ph{border-color:rgba(255,204,102,.35); background:rgba(255,204,102,.10); color:var(--warn);}
+    .tag.sh{border-color:rgba(92,200,255,.35); background:rgba(92,200,255,.10); color:var(--accent);}
+    .tag.pay{border-color:rgba(61,220,151,.35); background:rgba(61,220,151,.10); color:var(--good);}
+    .tag.ml{border-color:rgba(180,120,255,.40); background:rgba(180,120,255,.12); color:rgba(210,170,255,1);}
+
+    /* Mobile cards */
+    .dayCards{display:none}
+    .dayCard{
+      background:rgba(12,20,40,.72);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:18px;
+      padding:12px;
+      margin:10px 14px 0;
+    }
+    .dayCardHead{
+      display:flex; justify-content:space-between; align-items:flex-start; gap:10px;
+    }
+    .dayCardHead .left{cursor:pointer}
+    .dayCardHead .dateLine{font-weight:900}
+    .dayCardHead .subLine{color:var(--muted); font-size:12px; margin-top:2px}
+    .dayCard .twoCols{
+      display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;
+    }
+    .dayCard .hoursLine{
+      display:flex; align-items:center; justify-content:space-between;
+      margin-top:10px;
+      font-variant-numeric: tabular-nums;
+    }
+    .dayCard .hoursLine b{font-size:14px}
+    .miniBtn{
+      display:inline-flex; align-items:center; justify-content:center;
+      padding:8px 10px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.12);
+      background:#0c1428;
+      cursor:pointer;
+      user-select:none;
+      font-size:12px;
+    }
+    .miniBtn.on{border-color:rgba(92,200,255,.5); background:rgba(92,200,255,.12);}
+
+    @media (max-width: 980px){
+      .controls{grid-template-columns:1fr}
+      .grid{grid-template-columns:1fr}
+      .twrap{max-height:none}
+    }
+    @media (max-width: 720px){
+      .twrap{display:none}
+      .dayCards{display:block}
+      th{position:static}
+      .tableHead .desc{display:none}
+    }
+  
+    /* Light theme */
+    body[data-theme="light"]{
+      --bg:#f5f7ff;
+      --card:#ffffff;
+      --muted:#4b5b7a;
+      --text:#0b1220;
+      --accent:#1565ff;
+      --line:#d8e0ff;
+      background: radial-gradient(1200px 800px at 30% 0%, #ffffff 0%, #f0f4ff 55%, #e7eeff 100%);
+      color:var(--text);
+    }
+    body[data-theme="light"] .title{
+      background:linear-gradient(180deg, rgba(21,101,255,.10), rgba(255,255,255,0));
+      border-color: rgba(21,101,255,.20);
+    }
+    body[data-theme="light"] .card{
+      background:rgba(255,255,255,.92);
+      border-color: rgba(11,18,32,.10);
+    }
+    body[data-theme="light"] select,
+    body[data-theme="light"] input{
+      background:#ffffff;
+      color:var(--text);
+      border-color: rgba(11,18,32,.15);
+    }
+    body[data-theme="light"] button.secondary{
+      background:#ffffff;
+      border-color: rgba(11,18,32,.15);
+    }
+    body[data-theme="light"] th{
+      background:rgba(240,244,255,.95);
+      color:var(--muted);
+    }
+    body[data-theme="light"] .metric{
+      background:rgba(255,255,255,.92);
+      border-color: rgba(11,18,32,.10);
+    }
+    body[data-theme="light"] .status{
+      background:rgba(255,255,255,.9);
+      border-color: rgba(11,18,32,.12);
+    }
+    body[data-theme="light"] .lockBtn,
+    body[data-theme="light"] .miniBtn{
+      background:#ffffff;
+      border-color: rgba(11,18,32,.15);
+      color:var(--text);
+    }
+
+  
+    /* Improved Light theme contrast for mobile cards */
+    body[data-theme="light"] .dayCard{
+      background:#ffffff;
+      border-color:#cfd9ff;
+      box-shadow: 0 6px 16px rgba(21,101,255,.12);
+    }
+    body[data-theme="light"] .dayCardHead{
+      border-bottom:1px solid #e3e9ff;
+      padding-bottom:6px;
+    }
+    body[data-theme="light"] .dayCard .subLine{
+      color:#5a6aa0;
+    }
+    body[data-theme="light"] .hoursLine{
+      background:#f4f7ff;
+      border-radius:12px;
+      padding:6px 10px;
+      margin-top:10px;
+    }
+
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <header>
+      <div class="title">
+        <h1>Hours & Pay</h1>
+        <div class="sub">
+          Pick a year + cycle → set default start time → lock/enter some days → the rest auto-balances to hit the cycle maximum.
+          <br/>Tap a <b>date</b> to toggle: Normal → Public Holiday → School Holiday → Normal.
+        </div>
+      </div>
+
+      <div class="controls">
+        <div class="card field">
+          <label>Year</label>
+          <select id="yearSel"></select>
+          <div class="row" style="margin-top:10px">
+            <div class="field" style="flex:1">
+              <label>Cycle</label>
+              <select id="cycleSel"></select>
+            </div>
+          </div>
+          <div class="row" style="margin-top:10px">
+            <div class="field" style="flex:1">
+              <label>Theme</label>
+              <select id="themeSel">
+                <option value="dark">Dark theme</option>
+                <option value="light">Light theme</option>
+              </select>
+            </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card field">
+          <label>Default start time (applies to all weekdays)</label>
+          <select id="defaultStartSel"></select>
+
+          <div class="row" style="margin-top:10px">
+            <div class="field">
+              <label>Hours per weekday (for max claimable)</label>
+              <input id="hoursPerDay" type="number" min="0" step="0.25" value="6.5" />
+            </div>
+            <div class="field">
+              <label>Pay per hour ($)</label>
+              <input id="payPerHour" type="number" min="0" step="0.01" value="0" />
+            </div>
+          </div>
+
+          <div class="btnrow">
+            <button id="applyDefaultStartBtn" title="Set start time for all days in this cycle">Apply start time to all</button>
+            <button class="secondary" id="autoBalanceBtn" title="Recalculate all unlocked working days to hit the maximum">Auto-balance cycle</button>
+          </div>
+        </div>
+
+        <div class="card summary" id="summaryCard">
+          <div class="metric">
+            <div class="k">Cycle maximum claimable hours</div>
+            <div class="v" id="maxHours">0.00</div>
+            <div class="hint">= (weekdays Mon–Fri in this cycle) × hours per weekday</div>
+            <div class="pill">
+              <b id="weekdayCount">0</b> weekdays
+              <span>•</span>
+              <b id="schoolHolidayCount">0</b> school-holiday days (hours forced to 0)
+              <span>•</span>
+              <b id="publicHolidayCount">0</b> public-holidays (still count in max)
+            </div>
+          </div>
+
+          <div class="metric">
+            <div class="k">Total hours entered (after auto-balance)</div>
+            <div class="v" id="totalHours">0.00</div>
+            <div class="hint" id="remainHint">Remaining hours are distributed across unlocked working days.</div>
+            <div class="pill">
+              Holiday pay bonus: <b id="holidayBonusHours">0.0</b> hours × rate
+            </div>
+          </div>
+
+          <div class="metric">
+            <div class="k">Gross salary (cycle)</div>
+            <div class="v" id="grossPay">$0.00</div>
+            <div class="k" style="margin-top:8px">After CPF (gross × 80%)</div>
+            <div class="v" id="afterCpf">$0.00</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="grid">
+      <div class="card tableCard">
+        <div class="tableHead">
+          <div class="left">
+            <div class="name" id="cycleTitle">Cycle</div>
+            <div class="desc">Public holiday & School holiday days have 0 hours, but both still count in max (weekdays only).</div>
+          </div>
+          <div class="right">
+            <span class="status" id="statusPill">—</span>
+            <span class="small">Rounding: 15-min blocks</span>
+          </div>
+        </div>
+
+        <!-- Desktop table -->
+        <div class="twrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:310px">Date (tap to toggle holiday)</th>
+                <th style="width:220px">Start</th>
+                <th style="width:220px">End</th>
+                <th class="rightAlign" style="width:90px">Hours</th>
+                <th class="lockCell">Lock</th>
+              </tr>
+            </thead>
+            <tbody id="daysBody"></tbody>
+          </table>
+        </div>
+
+        <!-- Mobile cards -->
+        <div class="dayCards" id="dayCards"></div>
+
+        <div class="note" style="padding:12px 14px">
+          Tap a <b>date</b> to toggle: Normal → <span class="tag ph">Public Holiday</span> → <span class="tag sh">School Holiday</span> → <span class="tag ml">ML/CCL</span> → Normal.
+          <br/>Holiday pay toggle adds <b>+5.5 hours</b> of pay (not included in maximum hours calculation).
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="font-weight:900; margin-bottom:8px">Quick actions</div>
+        <div class="small">These affect the current cycle only.</div>
+
+        <div class="btnrow" style="margin-top:10px">
+          <button class="secondary" id="clearCycleBtn">Clear this cycle</button>
+          <button class="secondary" id="unlockAllBtn">Unlock all days</button>
+          <button class="secondary" id="lockAllBtn">Lock all days</button>
+        </div>
+
+        <div class="note">
+          <b>Auto-loaded rules:</b><br/>
+          For <b>2026</b>, Singapore public holidays (and in-lieu Mondays) load as <span class="tag ph">Public Holiday</span> with names.<br/>
+          MOE school vacation blocks + scheduled school closure days load as <span class="tag sh">School Holiday</span> with names (excluded from max).
+        </div>
+
+        <div class="note">
+          <b>Saving:</b> Everything is saved on-device (localStorage) per <b>Year + Cycle</b>.
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // ---------- Helpers ----------
+  const pad2 = n => String(n).padStart(2,"0");
+  const fmtDate = (d) => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+  const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const dowNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+  function parseTimeToMinutes(str){
+    if(!str) return null;
+    const [h,m]=str.split(":").map(Number);
+    if(Number.isNaN(h)||Number.isNaN(m)) return null;
+    return h*60+m;
+  }
+  function minutesToTime(mins){
+    mins = Math.max(0, Math.min(23*60+59, Math.round(mins)));
+    const h = Math.floor(mins/60), m = mins%60;
+    return `${pad2(h)}:${pad2(m)}`;
+  }
+  function roundTo15(mins){ return Math.round(mins/15)*15; }
+  function floorTo15(mins){ return Math.floor(mins/15)*15; }
+  function clamp(min, v, max){ return Math.max(min, Math.min(max, v)); }
+  function money(n){ const v = (Number(n)||0); return "$" + v.toFixed(2); }
+  function hoursFromMinutes(mins){ return (mins/60); }
+  function minutesFromHours(hours){ return Math.round((hours*60)); }
+
+  // ---------- Embedded Holiday datasets (Singapore 2026 + MOE 2026) ----------
+  // Public holiday names shown for 2026. (If you pick other years, holidays won't auto-load.)
+  const DATA_2026 = {
+    publicHolidays: new Set([
+      "2026-01-01",
+      "2026-02-17","2026-02-18",
+      "2026-03-21",
+      "2026-04-03",
+      "2026-05-01",
+      "2026-05-27",
+      "2026-05-31",
+      "2026-08-09",
+      "2026-11-08",
+      "2026-12-25",
+      // In-lieu public holidays (Mondays)
+      "2026-06-01",
+      "2026-08-10",
+      "2026-11-09"
+    ]),
+    publicHolidayNames: {
+      "2026-01-01": "New Year's Day",
+      "2026-02-17": "Chinese New Year (Day 1)",
+      "2026-02-18": "Chinese New Year (Day 2)",
+      "2026-03-21": "Hari Raya Puasa",
+      "2026-04-03": "Good Friday",
+      "2026-05-01": "Labour Day",
+      "2026-05-27": "Vesak Day",
+      "2026-05-31": "Hari Raya Haji",
+      "2026-06-01": "Hari Raya Haji (in lieu)",
+      "2026-08-09": "National Day",
+      "2026-08-10": "National Day (in lieu)",
+      "2026-11-08": "Deepavali",
+      "2026-11-09": "Deepavali (in lieu)",
+      "2026-12-25": "Christmas Day"
+    },
+    // MOE school vacation blocks (inclusive) + school closure days
+    schoolVacationRanges: [
+      ["2026-03-14","2026-03-22","March School Holidays"],
+      ["2026-05-30","2026-06-28","June School Holidays"],
+      ["2026-09-05","2026-09-13","September School Holidays"],
+      ["2026-11-21","2026-12-31","End of Year School Holidays"]
+    ],
+    schoolClosureDays: {
+      "2026-03-23": "School Holiday (in lieu)",
+      "2026-07-06": "Youth Day",
+      "2026-09-04": "Teachers' Day",
+      "2026-10-02": "Children's Day"
+    }
+  };
+
+  function isWeekdayISO(iso){
+    const d = new Date(iso+"T00:00:00");
+    const dow = d.getDay();
+    return dow >= 1 && dow <= 5;
+  }
+  function expandWeekdayRangeToSet(startISO, endISO){
+    const out = new Set();
+    const d = new Date(startISO+"T00:00:00");
+    const end = new Date(endISO+"T00:00:00");
+    while(d <= end){
+      const dow = d.getDay();
+      if(dow >= 1 && dow <= 5) out.add(fmtDate(d));
+      d.setDate(d.getDate()+1);
+    }
+    return out;
+  }
+  function buildSchoolHolidaySetFor2026(){
+    const set = new Set();
+    for(const [a,b] of DATA_2026.schoolVacationRanges){
+      const s = expandWeekdayRangeToSet(a,b);
+      for(const x of s) set.add(x);
+    }
+    for(const iso of Object.keys(DATA_2026.schoolClosureDays)){
+      if(isWeekdayISO(iso)) set.add(iso);
+    }
+    return set;
+  }
+  const SCHOOL_2026_SET = buildSchoolHolidaySetFor2026();
+
+  function schoolHolidayLabel2026(iso){
+    for(const [a,b,label] of DATA_2026.schoolVacationRanges){
+      if(iso >= a && iso <= b) return label;
+    }
+    return DATA_2026.schoolClosureDays[iso] || "School Holiday";
+  }
+
+  function getAutoFlagsForDate(iso){
+    const y = Number(iso.slice(0,4));
+    let isPH = false, isSH = false;
+    if(y === 2026){
+      isPH = DATA_2026.publicHolidays.has(iso) && isWeekdayISO(iso);
+      isSH = SCHOOL_2026_SET.has(iso);
+    }
+    return {isPH, isSH};
+  }
+
+  // ---------- Cycle generation ----------
+  function lastDayOfMonth(year, monthIndex){ return new Date(year, monthIndex+1, 0).getDate(); }
+  function getCycleByIndex(year, cycleIndex){
+    const monthIndex = Math.floor((cycleIndex-1)/2);
+    const half = (cycleIndex % 2 === 1) ? 1 : 2;
+    const startDay = (half===1) ? 1 : 16;
+    const endDay = (half===1) ? 15 : lastDayOfMonth(year, monthIndex);
+    const start = new Date(year, monthIndex, startDay);
+    const end = new Date(year, monthIndex, endDay);
+    return {year, monthIndex, half, startDay, endDay, start, end};
+  }
+  function cycleLabel(year, cycleIndex){
+    const c = getCycleByIndex(year, cycleIndex);
+    const m = monthNames[c.monthIndex];
+    return `${String(cycleIndex).padStart(2,'0')}: ${m} ${c.startDay}–${c.endDay} ${year}`;
+  }
+  function listWeekdaysInCycle(cycle){
+    const days = [];
+    const d = new Date(cycle.start);
+    while(d <= cycle.end){
+      const dow = d.getDay();
+      if(dow >= 1 && dow <= 5) days.push(new Date(d));
+      d.setDate(d.getDate()+1);
+    }
+    return days;
+  }
+
+  // ---------- Storage ----------
+  const LS_PREFIX = "hoursPayApp_full_v8";
+  function keyFor(year, cycleIndex){ return `${LS_PREFIX}:${year}:C${cycleIndex}`; }
+  function settingsKey(){ return `${LS_PREFIX}:settings`; }
+  function loadSettings(){ try{ return JSON.parse(localStorage.getItem(settingsKey()) || "{}"); } catch{ return {}; } }
+  function saveSettings(obj){ localStorage.setItem(settingsKey(), JSON.stringify(obj)); }
+  function loadCycleData(year, cycleIndex){ try{ return JSON.parse(localStorage.getItem(keyFor(year, cycleIndex)) || "{}"); } catch{ return {}; } }
+  function saveCycleData(year, cycleIndex, data){ localStorage.setItem(keyFor(year, cycleIndex), JSON.stringify(data)); }
+
+  // ---------- Time options ----------
+  function buildTimeOptions({stepMin=15, start="05:00", end="22:00"}){
+    const out = [];
+    let a = parseTimeToMinutes(start);
+    let b = parseTimeToMinutes(end);
+    a = a ?? 0; b = b ?? (23*60+45);
+    for(let t=a; t<=b; t+=stepMin) out.push(minutesToTime(t));
+    return out;
+  }
+  const START_OPTIONS = ["07:15","07:30","07:45","08:00"];
+  const ALL_TIME_15 = buildTimeOptions({stepMin:15, start:"00:00", end:"23:45"});
+  const END_OPTIONS = buildTimeOptions({stepMin:15, start:"06:00", end:"23:45"});
+
+  // ---------- App State ----------
+  const el = (id)=>document.getElementById(id);
+  const HOLIDAY_PAY_HOURS = 5.5;
+
+  const state = {
+    year: new Date().getFullYear(),
+    cycleIndex: 1,
+    defaultStart: "07:15",
+    hoursPerWeekday: 6.5,
+    payPerHour: 0,
+    theme: "dark",
+    days: [] // {date,start,end,locked,isPublicHoliday,isSchoolHoliday,isMLCCL,holidayPay}
+  };
+
+  function currentCycle(){ return getCycleByIndex(state.year, state.cycleIndex); }
+
+  
+  function applyTheme(){
+    const t = state.theme || "dark";
+    document.body.setAttribute("data-theme", t);
+    const sel = document.getElementById("themeSel");
+    if(sel) sel.value = t;
+  }
+
+// ---------- UI Init ----------
+  function initYearSelector(){
+    const ySel = el("yearSel");
+    ySel.innerHTML = "";
+    const nowY = new Date().getFullYear();
+    for(let y=nowY-3; y<=nowY+8; y++){
+      const opt = document.createElement("option");
+      opt.value = String(y);
+      opt.textContent = String(y);
+      ySel.appendChild(opt);
+    }
+    ySel.value = String(state.year);
+    ySel.addEventListener("change", ()=>{
+      state.year = Number(ySel.value);
+      rebuildCycleOptions();
+      loadCycleIntoState();
+      renderAll();
+    });
+  }
+
+  function rebuildCycleOptions(){
+    const cSel = el("cycleSel");
+    cSel.innerHTML = "";
+    for(let i=1;i<=24;i++){
+      const opt = document.createElement("option");
+      opt.value = String(i);
+      opt.textContent = cycleLabel(state.year, i);
+      cSel.appendChild(opt);
+    }
+    state.cycleIndex = clamp(1, state.cycleIndex, 24);
+    cSel.value = String(state.cycleIndex);
+    cSel.onchange = ()=>{
+      state.cycleIndex = Number(cSel.value);
+      loadCycleIntoState();
+      renderAll();
+    };
+  }
+
+  function initDefaultStart(){
+    const ds = el("defaultStartSel");
+    ds.innerHTML = "";
+    const seen = new Set();
+    for(const t of START_OPTIONS){
+      const opt = document.createElement("option");
+      opt.value = t; opt.textContent = t;
+      ds.appendChild(opt);
+      seen.add(t);
+    }
+    const sep = document.createElement("option");
+    sep.textContent = "────────";
+    sep.disabled = true;
+    ds.appendChild(sep);
+    for(const t of ALL_TIME_15){
+      if(seen.has(t)) continue;
+      const opt = document.createElement("option");
+      opt.value = t; opt.textContent = t;
+      ds.appendChild(opt);
+    }
+    ds.value = state.defaultStart;
+    ds.addEventListener("change", ()=>{
+      state.defaultStart = ds.value;
+      persistSettings();
+    });
+  }
+
+  function initInputs(){
+    el("hoursPerDay").addEventListener("input", ()=>{
+      state.hoursPerWeekday = Number(el("hoursPerDay").value) || 0;
+      persistSettings();
+      autoBalance();
+      renderAll();
+    });
+
+    el("payPerHour").addEventListener("input", ()=>{
+      state.payPerHour = Number(el("payPerHour").value) || 0;
+      persistSettings();
+      renderSummary();
+    });
+
+    el("applyDefaultStartBtn").addEventListener("click", ()=>{
+      for(const d of state.days) d.start = state.defaultStart;
+      saveCycleFromState();
+      autoBalance();
+      renderAll();
+    });
+
+    el("autoBalanceBtn").addEventListener("click", ()=>{
+      autoBalance();
+      renderAll();
+    });
+
+    el("clearCycleBtn").addEventListener("click", ()=>{
+      if(!confirm("Clear all times for this cycle?")) return;
+      for(const d of state.days){
+        d.start = state.defaultStart;
+        d.end = "";
+        d.locked = false;
+        d.holidayPay = false;
+        if(d.isPublicHoliday || d.isSchoolHoliday || d.isMLCCL){
+          d.end = "";
+          d.locked = true;
+        }
+      }
+      saveCycleFromState();
+      autoBalance();
+      renderAll();
+    });
+
+    el("unlockAllBtn").addEventListener("click", ()=>{
+      for(const d of state.days){
+        if(d.isPublicHoliday || d.isSchoolHoliday) d.locked = true;
+        else d.locked = false;
+      }
+      saveCycleFromState();
+      autoBalance();
+      renderAll();
+    });
+
+    el("themeSel").addEventListener("change", ()=>{
+      state.theme = el("themeSel").value;
+      applyTheme();
+      persistSettings();
+    });
+
+    el("lockAllBtn").addEventListener("click", ()=>{
+      for(const d of state.days) d.locked = true;
+      saveCycleFromState();
+      renderAll();
+    });
+  }
+
+  // ---------- Load / Save ----------
+  function persistSettings(){
+    const s = loadSettings();
+    s.defaultStart = state.defaultStart;
+    s.hoursPerWeekday = state.hoursPerWeekday;
+    s.payPerHour = state.payPerHour;
+    s.theme = state.theme;
+    saveSettings(s);
+  }
+
+  function loadSettingsIntoState(){
+    const s = loadSettings();
+    if(typeof s.defaultStart === "string") state.defaultStart = s.defaultStart;
+    if(typeof s.hoursPerWeekday === "number") state.hoursPerWeekday = s.hoursPerWeekday;
+    if(typeof s.payPerHour === "number") state.payPerHour = s.payPerHour;
+    if(typeof s.theme === "string") state.theme = s.theme;
+
+    el("defaultStartSel").value = state.defaultStart;
+    el("hoursPerDay").value = String(state.hoursPerWeekday);
+    el("payPerHour").value = String(state.payPerHour);
+
+    const ts = document.getElementById("themeSel");
+    if(ts) ts.value = state.theme || "dark";
+
+    // Theme
+    if(!state.theme) state.theme = "dark";
+    applyTheme();
+  }
+
+  function ensureCycleDays(){
+    const cyc = currentCycle();
+    const weekdays = listWeekdaysInCycle(cyc);
+    const byDate = new Map(state.days.map(d => [d.date, d]));
+    const newDays = [];
+
+    for(const dt of weekdays){
+      const date = fmtDate(dt);
+      const existing = byDate.get(date);
+      const auto = getAutoFlagsForDate(date);
+
+      const isPublicHoliday = existing?.isPublicHoliday ?? auto.isPH;
+      const isSchoolHoliday = existing?.isSchoolHoliday ?? auto.isSH;
+
+      const dayObj = {
+        date,
+        start: existing?.start ?? state.defaultStart,
+        end: existing?.end ?? "",
+        locked: existing?.locked ?? false,
+        isPublicHoliday,
+        isSchoolHoliday,
+        isMLCCL: existing?.isMLCCL ?? false,
+        holidayPay: existing?.holidayPay ?? false
+      };
+
+      if(dayObj.isPublicHoliday || dayObj.isSchoolHoliday || dayObj.isMLCCL){
+        dayObj.isMLCCL = false;
+        dayObj.end = "";
+        dayObj.locked = true;
+      }
+
+      newDays.push(dayObj);
+    }
+
+    state.days = newDays;
+  }
+
+  function loadCycleIntoState(){
+    const data = loadCycleData(state.year, state.cycleIndex);
+    state.days = Array.isArray(data.days) ? data.days : [];
+
+    if(typeof data.defaultStart === "string") state.defaultStart = data.defaultStart;
+    if(typeof data.hoursPerWeekday === "number") state.hoursPerWeekday = data.hoursPerWeekday;
+    if(typeof data.payPerHour === "number") state.payPerHour = data.payPerHour;
+
+    ensureCycleDays();
+
+    el("defaultStartSel").value = state.defaultStart;
+    el("hoursPerDay").value = String(state.hoursPerWeekday);
+    el("payPerHour").value = String(state.payPerHour);
+
+    const ts = document.getElementById("themeSel");
+    if(ts) ts.value = state.theme || "dark";
+
+    // Theme
+    if(!state.theme) state.theme = "dark";
+    applyTheme();
+
+    autoBalance();
+    saveCycleFromState();
+  }
+
+  function saveCycleFromState(){
+    const data = {
+      defaultStart: state.defaultStart,
+      hoursPerWeekday: state.hoursPerWeekday,
+      payPerHour: state.payPerHour,
+      days: state.days
+    };
+    saveCycleData(state.year, state.cycleIndex, data);
+  }
+
+  // ---------- Toggles ----------
+  function toggleHolidayState(day){
+    // Cycle: Normal -> Public -> School -> ML/CCL -> Normal
+    if(!day.isPublicHoliday && !day.isSchoolHoliday && !day.isMLCCL){
+      day.isPublicHoliday = true;
+      day.isSchoolHoliday = false;
+      day.isMLCCL = false;
+    }else if(day.isPublicHoliday){
+      day.isPublicHoliday = false;
+      day.isSchoolHoliday = true;
+      day.isMLCCL = false;
+      day.holidayPay = false;
+    }else if(day.isSchoolHoliday){
+      day.isPublicHoliday = false;
+      day.isSchoolHoliday = false;
+      day.isMLCCL = true;
+      day.holidayPay = false; // user can re-toggle pay if needed
+    }else{
+      day.isPublicHoliday = false;
+      day.isSchoolHoliday = false;
+      day.isMLCCL = false;
+    }
+
+    if(day.isPublicHoliday || day.isSchoolHoliday || day.isMLCCL){
+      day.end = "";
+      day.locked = true;
+    }else{
+      day.locked = false;
+      if(!day.start) day.start = state.defaultStart;
+    }
+
+    saveCycleFromState();
+    autoBalance();
+    renderAll();
+  }
+
+  function toggleHolMLCCLPay(day){
+    // Toggling Hol/ML/CCL Pay means:
+    // - Add/remove +5.5h pay bonus
+    // - If the day is not a Public Holiday or School Holiday, treat it as ML/CCL (0 hours) while the bonus is ON
+    // - Re-auto-balance other unlocked days to still hit the cycle maximum (max is weekday-based and unchanged)
+    day.holidayPay = !day.holidayPay;
+
+    if(!day.isPublicHoliday && !day.isSchoolHoliday){
+      if(day.holidayPay){
+        // Mark as ML/CCL (0 hours)
+        day.isMLCCL = true;
+        day.end = "";
+        day.locked = true;
+      }else{
+        // Remove ML/CCL marking (back to normal working day)
+        day.isMLCCL = false;
+        day.locked = false;
+        if(!day.start) day.start = state.defaultStart;
+        // end will be set by autoBalance
+      }
+    }
+
+    saveCycleFromState();
+    autoBalance();
+    renderAll();
+  }
+
+  // ---------- Calculations ----------
+  function calcDayMinutes(day){
+    if(day.isPublicHoliday || day.isSchoolHoliday || day.isMLCCL) return 0;
+    const s = parseTimeToMinutes(day.start);
+    const e = parseTimeToMinutes(day.end);
+    if(s==null || e==null) return null;
+    const mins = e - s;
+    if(!Number.isFinite(mins) || mins < 0) return null;
+    return mins;
+  }
+
+  function counts(){
+    let schoolH = 0, publicH = 0;
+    for(const d of state.days){
+      if(d.isSchoolHoliday) schoolH++;
+      if(d.isPublicHoliday) publicH++;
+    }
+    return {schoolH, publicH};
+  }
+
+  function cycleMaxMinutes(){
+    // Max claimable hours is STRICTLY based on the number of weekdays (Mon–Fri) in the cycle.
+    // Public holidays, school holidays and ML/CCL do NOT change the max. Weekends are never included (state.days = weekdays only).
+    const weekdayCount = state.days.length;
+    return minutesFromHours(state.hoursPerWeekday) * weekdayCount;
+  }
+
+  function autoBalance(){
+    ensureCycleDays();
+    const target = cycleMaxMinutes();
+
+    let fixedSum = 0;
+    const adjustable = [];
+
+    for(const d of state.days){
+      if(d.isPublicHoliday || d.isSchoolHoliday || d.isMLCCL){
+        fixedSum += 0;
+        continue;
+      }
+      if(d.locked){
+        const m = calcDayMinutes(d);
+        fixedSum += (m ?? 0);
+      }else{
+        adjustable.push(d);
+      }
+    }
+
+    let remaining = target - fixedSum;
+    if(remaining < 0) remaining = 0;
+
+    const n = adjustable.length;
+    if(n === 0){
+      saveCycleFromState();
+      return;
+    }
+
+    const rem15 = floorTo15(remaining);
+    const base = Math.floor(rem15 / n / 15) * 15;
+    let leftover = rem15 - base * n;
+
+    for(let i=0;i<n;i++){
+      const d = adjustable[i];
+      const startM = parseTimeToMinutes(d.start) ?? parseTimeToMinutes(state.defaultStart) ?? 0;
+
+      let add = 0;
+      if(leftover >= 15){
+        add = 15;
+        leftover -= 15;
+      }
+
+      const dayMinutes = clamp(0, base + add, 18*60);
+      const endM = roundTo15(startM + dayMinutes);
+      d.end = minutesToTime(clamp(0, endM, 23*60+45));
+    }
+
+    saveCycleFromState();
+  }
+
+  function totalWorkedMinutes(){
+    let sum = 0;
+    for(const d of state.days){
+      const m = calcDayMinutes(d);
+      sum += (m ?? 0);
+    }
+    return sum;
+  }
+
+  function holidayBonusHours(){
+    let n = 0;
+    for(const d of state.days){
+      if(d.holidayPay) n++;
+    }
+    return n * HOLIDAY_PAY_HOURS;
+  }
+
+  // ---------- Rendering ----------
+  function renderCycleHeader(){
+    const c = currentCycle();
+    const name = `${monthNames[c.monthIndex]} ${c.startDay}–${c.endDay} ${c.year}`;
+    el("cycleTitle").textContent = name;
+
+    const {schoolH, publicH} = counts();
+    el("weekdayCount").textContent = String(state.days.length);
+    el("schoolHolidayCount").textContent = String(schoolH);
+    el("publicHolidayCount").textContent = String(publicH);
+
+    const maxMins = cycleMaxMinutes();
+    el("maxHours").textContent = (hoursFromMinutes(maxMins)).toFixed(2);
+  }
+
+  function renderSummary(){
+    const maxMins = cycleMaxMinutes();
+    const totalMins = totalWorkedMinutes();
+    const totalH = hoursFromMinutes(totalMins);
+
+    el("totalHours").textContent = totalH.toFixed(2);
+
+    const rate = (Number(state.payPerHour)||0);
+    const bonusH = holidayBonusHours();
+    el("holidayBonusHours").textContent = bonusH.toFixed(1);
+
+    const gross = (totalH * rate) + (bonusH * rate);
+    el("grossPay").textContent = money(gross);
+    el("afterCpf").textContent = money(gross * 0.8);
+
+    const diffM = totalMins - maxMins;
+    const pill = el("statusPill");
+    pill.className = "status";
+    const absDiff = Math.abs(diffM);
+    const roundedPossible = (maxMins % 15 === 0);
+
+    if(absDiff < 1){
+      pill.textContent = roundedPossible ? "On target" : "On target (best possible)";
+      pill.classList.add("good");
+    }else if(diffM < 0){
+      pill.textContent = `Under by ${(hoursFromMinutes(-diffM)).toFixed(2)}h`;
+      pill.classList.add("warn");
+    }else{
+      pill.textContent = `Over by ${(hoursFromMinutes(diffM)).toFixed(2)}h`;
+      pill.classList.add("bad");
+    }
+
+    el("remainHint").textContent = roundedPossible
+      ? "Remaining hours are distributed across unlocked working days (15-min blocks) to match the cycle maximum."
+      : "Note: max hours isn't divisible by 15 minutes, so auto-balance matches as closely as dropdown rounding allows.";
+  }
+
+  function makeSelect(options, value, onChange){
+    const s = document.createElement("select");
+    for(const t of options){
+      const opt = document.createElement("option");
+      opt.value = t; opt.textContent = t;
+      s.appendChild(opt);
+    }
+    const blank = document.createElement("option");
+    blank.value = "";
+    blank.textContent = "—";
+    s.insertBefore(blank, s.firstChild);
+
+    s.value = value ?? "";
+    s.addEventListener("change", ()=> onChange(s.value));
+    return s;
+  }
+
+  function buildTagsHTML(d){
+    const tags = [];
+
+    if(d.isPublicHoliday){
+      let name = "";
+      const y = Number(d.date.slice(0,4));
+      if(y === 2026 && DATA_2026.publicHolidayNames[d.date]){
+        name = ` – ${DATA_2026.publicHolidayNames[d.date]}`;
+      }
+      tags.push(`<span class="tag ph">Public Holiday${name}</span>`);
+    }
+
+    if(d.isSchoolHoliday){
+      let name = "";
+      const y = Number(d.date.slice(0,4));
+      if(y === 2026){
+        name = ` – ${schoolHolidayLabel2026(d.date)}`;
+      }
+      tags.push(`<span class="tag sh">School Holiday${name}</span>`);
+    }
+
+    if(d.isMLCCL){
+      tags.push(`<span class="tag ml">ML/CCL</span>`);
+    }
+
+    if(d.holidayPay){
+      tags.push(`<span class="tag pay">Hol/ML/CCL Pay +${HOLIDAY_PAY_HOURS}h</span>`);
+    }
+
+    return tags.length
+      ? `<div style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap">${tags.join(" ")}</div>`
+      : "";
+  }
+
+  function renderDaysTable(){
+    const tbody = el("daysBody");
+    tbody.innerHTML = "";
+
+    for(const d of state.days){
+      const dt = new Date(d.date + "T00:00:00");
+      const tr = document.createElement("tr");
+
+      const tdDate = document.createElement("td");
+      tdDate.className = "dateCell";
+      tdDate.innerHTML = `<b>${monthNames[dt.getMonth()]} ${dt.getDate()}</b><span class="dow">${dowNames[dt.getDay()]}</span>
+                          <div class="small">${d.date}</div>${buildTagsHTML(d)}`;
+      tdDate.addEventListener("click", ()=> toggleHolidayState(d));
+      tr.appendChild(tdDate);
+
+      const tdStart = document.createElement("td");
+      const startSel = makeSelect(ALL_TIME_15, d.start, (val)=>{
+        if(d.isPublicHoliday || d.isSchoolHoliday || d.isMLCCL) return;
+        d.start = val || state.defaultStart;
+        saveCycleFromState();
+        if(!d.locked) autoBalance();
+        renderAll();
+      });
+      startSel.disabled = (d.isPublicHoliday || d.isSchoolHoliday || d.isMLCCL);
+      tdStart.appendChild(startSel);
+      tr.appendChild(tdStart);
+
+      const tdEnd = document.createElement("td");
+      const endSel = makeSelect(END_OPTIONS, d.end, (val)=>{
+        if(d.isPublicHoliday || d.isSchoolHoliday || d.isMLCCL) return;
+        d.end = val;
+        d.locked = true; // manual end locks the day
+        saveCycleFromState();
+        autoBalance();
+        renderAll();
+      });
+      endSel.disabled = (d.isPublicHoliday || d.isSchoolHoliday || d.isMLCCL);
+      tdEnd.appendChild(endSel);
+      tr.appendChild(tdEnd);
+
+      const tdHours = document.createElement("td");
+      tdHours.className = "hoursCell";
+      const mins = calcDayMinutes(d);
+      tdHours.textContent = mins==null ? "0.00" : hoursFromMinutes(mins).toFixed(2);
+      tr.appendChild(tdHours);
+
+      const tdLock = document.createElement("td");
+      tdLock.className = "lockCell";
+
+      const wrap = document.createElement("div");
+      wrap.style.display = "flex";
+      wrap.style.flexDirection = "column";
+      wrap.style.gap = "8px";
+      wrap.style.alignItems = "center";
+
+      const lock = document.createElement("div");
+      lock.className = "lockBtn" + (d.locked ? " locked" : "");
+      lock.title = d.locked ? "Locked (won't auto-adjust)" : "Unlocked (will auto-adjust)";
+      lock.textContent = d.locked ? "🔒" : "🔓";
+      lock.addEventListener("click", (e)=>{
+        e.stopPropagation();
+        if(d.isPublicHoliday || d.isSchoolHoliday || d.isMLCCL) return;
+        d.locked = !d.locked;
+        saveCycleFromState();
+        autoBalance();
+        renderAll();
+      });
+
+      const chip = document.createElement("div");
+      chip.className = "miniBtn" + (d.holidayPay ? " on" : "");
+      chip.textContent = d.holidayPay ? "+5.5h ✅" : "+5.5h";
+      chip.title = "Toggle Hol/ML/CCL Pay/ML/CCL bonus (+5.5 hours of pay)";
+      chip.addEventListener("click", (e)=>{
+        e.stopPropagation();
+        toggleHolMLCCLPay(d);
+      });
+
+      wrap.appendChild(lock);
+      wrap.appendChild(chip);
+      tdLock.appendChild(wrap);
+      tr.appendChild(tdLock);
+
+      tbody.appendChild(tr);
+    }
+  }
+
+  function renderDayCards(){
+    const box = el("dayCards");
+    box.innerHTML = "";
+
+    for(const d of state.days){
+      const dt = new Date(d.date + "T00:00:00");
+      const card = document.createElement("div");
+      card.className = "dayCard";
+
+      const head = document.createElement("div");
+      head.className = "dayCardHead";
+
+      const left = document.createElement("div");
+      left.className = "left";
+      left.innerHTML = `<div class="dateLine">${monthNames[dt.getMonth()]} ${dt.getDate()} <span class="small">${dowNames[dt.getDay()]}</span></div>
+                        <div class="subLine">${d.date}</div>${buildTagsHTML(d)}`;
+      left.addEventListener("click", ()=> toggleHolidayState(d));
+
+      const right = document.createElement("div");
+      right.style.display = "flex";
+      right.style.flexDirection = "column";
+      right.style.alignItems = "flex-end";
+      right.style.gap = "8px";
+
+      const lockBtn = document.createElement("div");
+      lockBtn.className = "miniBtn" + (d.locked ? " on" : "");
+      lockBtn.textContent = d.locked ? "🔒 Locked" : "🔓 Unlocked";
+      lockBtn.addEventListener("click", ()=>{
+        if(d.isPublicHoliday || d.isSchoolHoliday || d.isMLCCL) return;
+        d.locked = !d.locked;
+        saveCycleFromState();
+        autoBalance();
+        renderAll();
+      });
+
+      const payBtn = document.createElement("div");
+      payBtn.className = "miniBtn" + (d.holidayPay ? " on" : "");
+      payBtn.textContent = d.holidayPay ? `Hol/ML/CCL Pay ✅` : `Hol/ML/CCL Pay`;
+      payBtn.title = "Toggle Hol/ML/CCL Pay/ML/CCL (+5.5h of pay)";
+      payBtn.addEventListener("click", ()=> toggleHolMLCCLPay(d));
+
+      right.appendChild(lockBtn);
+      right.appendChild(payBtn);
+
+      head.appendChild(left);
+      head.appendChild(right);
+
+      const two = document.createElement("div");
+      two.className = "twoCols";
+
+      const startWrap = document.createElement("div");
+      startWrap.className = "field";
+      startWrap.innerHTML = `<label>Start</label>`;
+      const startSel = makeSelect(ALL_TIME_15, d.start, (val)=>{
+        if(d.isPublicHoliday || d.isSchoolHoliday || d.isMLCCL) return;
+        d.start = val || state.defaultStart;
+        saveCycleFromState();
+        if(!d.locked) autoBalance();
+        renderAll();
+      });
+      startSel.disabled = (d.isPublicHoliday || d.isSchoolHoliday || d.isMLCCL);
+      startWrap.appendChild(startSel);
+
+      const endWrap = document.createElement("div");
+      endWrap.className = "field";
+      endWrap.innerHTML = `<label>End</label>`;
+      const endSel = makeSelect(END_OPTIONS, d.end, (val)=>{
+        if(d.isPublicHoliday || d.isSchoolHoliday || d.isMLCCL) return;
+        d.end = val;
+        d.locked = true;
+        saveCycleFromState();
+        autoBalance();
+        renderAll();
+      });
+      endSel.disabled = (d.isPublicHoliday || d.isSchoolHoliday || d.isMLCCL);
+      endWrap.appendChild(endSel);
+
+      two.appendChild(startWrap);
+      two.appendChild(endWrap);
+
+      const mins = calcDayMinutes(d);
+      const hours = mins==null ? 0 : hoursFromMinutes(mins);
+      const hrsLine = document.createElement("div");
+      hrsLine.className = "hoursLine";
+      hrsLine.innerHTML = `<div class="small">Hours</div><b>${hours.toFixed(2)}</b>`;
+
+      card.appendChild(head);
+      card.appendChild(two);
+      card.appendChild(hrsLine);
+      box.appendChild(card);
+    }
+  }
+
+  function renderAll(){
+    el("yearSel").value = String(state.year);
+    el("cycleSel").value = String(state.cycleIndex);
+    el("defaultStartSel").value = state.defaultStart;
+    el("hoursPerDay").value = String(state.hoursPerWeekday);
+    el("payPerHour").value = String(state.payPerHour);
+
+    const ts = document.getElementById("themeSel");
+    if(ts) ts.value = state.theme || "dark";
+
+    // Theme
+    if(!state.theme) state.theme = "dark";
+    applyTheme();
+
+    renderCycleHeader();
+    renderDaysTable();
+    renderDayCards();
+    renderSummary();
+  }
+
+  // ---------- Boot ----------
+  (function boot(){
+    const now = new Date();
+    state.year = now.getFullYear();
+    const day = now.getDate();
+    const monthIndex = now.getMonth();
+    const half = (day <= 15) ? 1 : 2;
+    state.cycleIndex = monthIndex*2 + (half===1 ? 1 : 2);
+
+    initYearSelector();
+    rebuildCycleOptions();
+    initDefaultStart();
+    initInputs();
+
+    loadSettingsIntoState();
+    loadCycleIntoState();
+    renderAll();
+  })();
+</script>
+</body>
+</html>
